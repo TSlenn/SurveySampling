@@ -1,0 +1,43 @@
+---
+title: "Cluster Selection"
+author: "Terry Slenn"
+date: "November 9, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Northwest DC Sample
+
+
+```{r NWDC}
+zips <- tibble(zipcode = c(20001,20004,20005,20007,20008,20009,20010,20016,20036),
+               pops = c(45925,1717,13234,27142,29527,51542,33654,34904,5836))
+
+sample_n(zips, 4, weight = pops)
+```
+
+## Arlington
+
+```{r Arl}
+zips <- tibble(zipcode = c(22201,22202,22203,22204,22205,22206,22207,22209,22213),
+               pops = c(37524,23509,24188,55378,18823,20336,33431,12335,3317))
+
+sample_n(zips, 2, weight = pops)
+```
+
+
+## Bethesda/Rockville
+
+```{r Beth}
+zips <- tibble(zipcode = c(20814,20815,20816,20817,20850,20851,20852,20853,20854,20855,20895),
+               pops = c(29005,30476,16248,37226,33557,13038,34956,27768,46255,17251,18713))
+
+sample_n(zips, 2, weight = pops)
+```
+
