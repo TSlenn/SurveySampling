@@ -1,0 +1,140 @@
+---
+title: "Data_Analysis"
+author: "Terry Slenn"
+date: "November 23, 2019"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages}
+library(tidyverse)
+library(gsheet)
+library(ggplot2)
+library(ggmap)
+```
+
+
+```{r gsheets}
+Prices <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1LC1dk9HlzCEqVPN2AGI6trGaXpwlP8wtyYheK6k700A/edit?usp=sharing')
+
+Prices <- Prices %>% 
+  separate(LAT_LONG, into = c("LAT", "LONG"), sep = ", ") %>% 
+  mutate(LAT = as.numeric(LAT), LONG = as.numeric(LONG))
+
+Stores <- Prices %>% 
+  distinct(ADDRESS, LAT, LONG, STORE, STATE)
+
+Prices %>% 
+  distinct(`ZIP CODE`, STATE)
+```
+
+
+```{r ggmap}
+DC_map <- get_map(location = c(lat = 38.937495, lon =-77.088846), zoom = 11)
+ggmap(DC_map) +
+  geom_point(data = Stores, mapping = aes(x = LONG, y = LAT, fill = STATE),
+             pch = 21, size = 2) +
+  theme_void() +
+  theme(legend.position = "none")+
+  scale_fill_viridis_d()
+```
+
+## Data Cleaning
+
+```{r data cleaning}
+OJ <- Prices %>% 
+  filter(PRODUCT == "Orange Juice") %>% 
+  mutate(PRICE_STD = PRICE/parse_number(SIZE)*64) ## Standardize to 64 oz
+
+Milk <- Prices %>% 
+  filter(PRODUCT == "Milk") %>% 
+  mutate(PRICE_STD = PRICE) ## SHOULD all be the same
+
+Eggs <- Prices %>% 
+  filter(PRODUCT == "Eggs") %>% 
+  mutate(PRICE_STD = PRICE/parse_number(SIZE)*64)
+
+Beef <- Prices %>% 
+  filter(PRODUCT == "Ground Beef") %>% 
+  mutate(PRICE_STD = PRICE)
+
+Potatoes <- Prices %>% 
+  filter(str_detect(PRODUCT, "ota")) %>% 
+  mutate(PRICE_STD = PRICE/parse_number(SIZE),
+         PRICE_STD = coalesce(PRICE_STD, PRICE))
+
+Cola <- Prices %>% 
+  filter(PRODUCT == "Cola") %>% 
+  mutate(PRICE_STD = PRICE)
+
+Tortilla <- Prices %>% 
+  filter(str_detect(PRODUCT, "illa")) %>% 
+  mutate(PRICE_STD = PRICE/parse_number(SIZE)*12)
+
+Prices <- bind_rows(OJ, Milk, Eggs, Beef, Potatoes, Cola, Tortilla) %>% 
+  group_by(ADDRESS, LAT, LONG, `ZIP CODE`, STATE, STORE) %>% 
+  summarize(All_Goods = sum(PRICE_STD),
+            Luxury = sum(PRICE_STD[PRODUCT %in% c("Cola", "Tortilla Chips")]),
+            Essential = All_Goods - Luxury)
+
+```
+
+## Exploratory Analysis
+
+```{r pricemap}
+Store_Price <- Stores %>% 
+  left_join(Prices)
+
+ggmap(DC_map) +
+  geom_point(data = Store_Price, mapping = aes(x = LONG, y = LAT, fill = All_Goods),
+             pch = 21, size = 2) +
+  theme_void() +
+  scale_fill_gradient(low = "green", high = "red")
+  #scale_fill_viridis_d()
+```
+
+```{r box plots}
+Prices %>% 
+  gather(key = "Basket", value = "Total_Price", All_Goods, Essential, Luxury) %>% 
+  ggplot(aes(x = STATE, y = Total_Price, color = STATE)) +
+  geom_boxplot() +
+  geom_jitter() +
+  facet_wrap(~ Basket, scales = "free_y") +
+  ggtitle("Basket of Goods Price: Region Comparison") +
+  theme(legend.position = "none")
+
+Prices %>% 
+  gather(key = "Basket", value = "Total_Price", All_Goods, Essential, Luxury) %>%
+  ggplot(aes(x = STORE, y = Total_Price, color = STORE)) +
+  geom_boxplot() +
+  geom_jitter() +
+  facet_wrap(~ Basket, scales = "free_y", nrow = 2) +
+  #coord_flip() +
+  ggtitle("Basket of Goods Price: Store Comparison") +
+  theme(legend.position = "none")
+```
+
+## Further work needed
+
+Need to perform formal statistics tests between groups and figure out how cluster sampling impacts that.  
+
+Need to pull in demographic info to evaluate any trends that may exist with demographics and income.
+
+
+
+
+
+
+
+**Problems:**
+  Milk was supposed to be gallon price.  Arlington data is throwing us way off.
+  8 lb bag of potatoes is also messing up data
+
+
+
