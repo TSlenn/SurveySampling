@@ -3,8 +3,8 @@ title: "Data_Analysis"
 author: "Terry Slenn"
 date: "November 23, 2019"
 output:
-  word_document: default
   pdf_document: default
+  word_document: default
   html_document: default
 ---
 
@@ -31,7 +31,8 @@ Stores <- Prices %>%
   distinct(ADDRESS, LAT, LONG, STORE, STATE)
 
 Prices %>% 
-  distinct(`ZIP CODE`, STATE)
+  distinct(`ZIP CODE`, STATE) %>% 
+  arrange(STATE)
 ```
 
 
@@ -39,7 +40,7 @@ Prices %>%
 DC_map <- get_map(location = c(lat = 38.937495, lon =-77.088846), zoom = 11)
 ggmap(DC_map) +
   geom_point(data = Stores, mapping = aes(x = LONG, y = LAT, fill = STATE),
-             pch = 21, size = 2) +
+             pch = 21, size = 2.5) +
   theme_void() +
   theme(legend.position = "none")+
   scale_fill_viridis_d()
@@ -58,7 +59,7 @@ Milk <- Prices %>%
 
 Eggs <- Prices %>% 
   filter(PRODUCT == "Eggs") %>% 
-  mutate(PRICE_STD = PRICE/parse_number(SIZE)*64)
+  mutate(PRICE_STD = PRICE/parse_number(SIZE)*12)
 
 Beef <- Prices %>% 
   filter(PRODUCT == "Ground Beef") %>% 
@@ -93,7 +94,7 @@ Store_Price <- Stores %>%
 
 ggmap(DC_map) +
   geom_point(data = Store_Price, mapping = aes(x = LONG, y = LAT, fill = All_Goods),
-             pch = 21, size = 2) +
+             pch = 21, size = 2.5) +
   theme_void() +
   scale_fill_gradient(low = "green", high = "red")
   #scale_fill_viridis_d()
@@ -128,13 +129,103 @@ Need to pull in demographic info to evaluate any trends that may exist with demo
 
 
 
+## Cluster Analysis
+
+Primary Sampling Unit (PSU): Zip Code  
+
+Secondary Sampling Unit (SSU): Grocery Store  
+
+Estimated average price for each zip code:  
+
+$\hat{\bar{y}}_i = \frac{\sum{t_i}}{\sum{m_i}}$  
+
+$Var(\hat{\bar{y}}_i) = Var(\frac{\sum{t_i}}{\sum{m_i}})$  
+
+$Var(\hat{\bar{y}}_i) = \frac{1}{(\sum{m_i})^2}  Var(\sum{t_i})$  
+
+$Var(\hat{\bar{y}}_i) = \frac{1}{(\sum{m_i})^2}  Var(\sum{t_i})$
 
 
 
+```{r cluster}
+DC <- Prices %>%  
+  gather(key = "Basket", value = "Total_Price", All_Goods, Essential, Luxury) %>% 
+  group_by(Basket, STATE) %>% 
+  filter(STATE == "DC") %>% 
+  summarize(Mean_hat = mean(Total_Price),
+            Var_hat = sum((Total_Price - Mean_hat)^2)/n(),
+            M = n())
 
-**Problems:**
-  Milk was supposed to be gallon price.  Arlington data is throwing us way off.
-  8 lb bag of potatoes is also messing up data
+Cluster_est <- Prices %>% 
+  gather(key = "Basket", value = "Total_Price", All_Goods, Essential, Luxury) %>% 
+  filter(STATE != "DC") %>% 
+  group_by(STATE, `ZIP CODE`, Basket) %>% 
+  summarize(Mean = mean(Total_Price),
+            Var = sum((Total_Price - Mean)^2)/n(),
+            m = n()) %>% 
+  group_by(STATE, Basket) %>% 
+  summarize(Mean_hat = sum(m*Mean)/sum(m),
+            Var_hat = sum(m*Var)/sum(m),
+            M = sum(m)) %>% 
+  rbind(DC)
+```
 
 
+```{r cluster_graph}
+Cluster_est %>% 
+  ggplot(aes(x = STATE, y = Mean_hat, color = STATE)) +
+  geom_errorbar(aes(ymin = Mean_hat - qt(.975,M-1), ymax = Mean_hat + qt(.975,M-1))) +
+  facet_wrap(~ Basket, scales = "free_y") +
+  ggtitle("Basket of Goods Price: Region Comparison") +
+  theme(legend.position = "none")
+```
 
+
+## Demographics
+
+```{r demo_data}
+
+Demographics <- gsheet2tbl('https://docs.google.com/spreadsheets/d/10TozoY2R9g64xsm9vJxvWwuuV4EX-CZic7RV2XhKCh4/edit?usp=sharing') %>% 
+  select(-Area)
+
+Prices_demo <- left_join(Prices, Demographics)
+
+Prices_demo %>%
+  ungroup() %>% 
+  select(-ADDRESS, -LAT, -LONG, -`ZIP CODE`, -STORE, -STATE, - Luxury, -Essential) %>% 
+  plot()
+
+Prices_demo %>% 
+  gather(key = "Basket", value = "Total_Price", All_Goods, Essential, Luxury) %>%
+  filter(Basket == "Luxury") %>% 
+  ggplot(aes(y = Total_Price, x = `poverty rate`, color = STATE)) +
+  geom_point() #+
+  #facet_wrap(~Basket, scale = "free_y")
+  #geom_smooth(method = "lm")
+
+lm(Luxury ~ `poverty rate`, data = Prices_demo) %>% 
+  summary()
+```
+
+
+```{r analysis}
+Prices_demo %>% 
+  ggplot(aes(x=`Population Density`, y = All_Goods)) +
+  geom_point(aes(color = STATE)) +
+  geom_smooth(method = "lm", se = FALSE)
+lm(All_Goods ~ `Population Density`, data = Prices_demo) %>% 
+  summary()
+
+Prices_demo %>% 
+  ggplot(aes(x=`Population Density`, y = Luxury)) +
+  geom_point(aes(color = STATE)) +
+  geom_smooth(method = "lm", se = FALSE)
+lm(Luxury ~ `Population Density`, data = Prices_demo) %>% 
+  summary()
+
+lm(Luxury ~ `Population Density` + `poverty rate`, data = Prices_demo) %>% 
+  summary()
+
+lm(All_Goods ~ `poverty rate` + `median income`, data = Prices_demo) %>% 
+  summary()
+```

@@ -3,8 +3,8 @@ title: "Cluster Selection Supplement"
 author: "Terry Slenn"
 date: "November 9, 2019"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -22,8 +22,8 @@ set.seed(8367) ## Manually set seed for reproducible results
 Previous zip codes have been removed.
 
 ```{r NWDC}
-zips <- tibble(zipcode = c(20004,20005,20008,20009,20036),
-               pops = c(1717,13234,29527,51542,5836))
+zips <- tibble(zipcode = c(20004,20005,20008,20009),
+               pops = c(1717,13234,29527,51542))
 
 sample_n(zips, 4, weight = pops)
 ```
@@ -41,8 +41,8 @@ sample_n(zips, 2, weight = pops)
 ## Bethesda/Rockville
 
 ```{r Beth}
-zips <- tibble(zipcode = c(20814,20815,20816,20817,20850,20851,20852,20855,20895),
-               pops = c(29005,30476,16248,37226,33557,13038,34956,17251,18713))
+zips <- tibble(zipcode = c(20814,20815,20816,20850,20852,20855,20895), #20851 and 20817 had no regular grocery stores
+               pops = c(29005,30476,16248,33557,34956,17251,18713))
 
 sample_n(zips, 2, weight = pops)
 ```
